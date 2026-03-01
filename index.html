@@ -120,7 +120,7 @@
             word-wrap: break-word;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             align-self: flex-start;
-            position: relative;
+            position: relative;  /* ADDED: для позиционирования кнопки удаления */
         }
         .message.own {
             background: #dcf8c6;
@@ -156,6 +156,27 @@
             max-height: 300px;
             border-radius: 10px;
             margin-top: 5px;
+        }
+        /* ADDED: стили для кнопки удаления */
+        .delete-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            opacity: 0.4;
+            transition: opacity 0.2s;
+            background: rgba(0,0,0,0.05);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .delete-btn:hover {
+            opacity: 1;
+            background: rgba(0,0,0,0.1);
         }
         .input-area {
             background: #f0f0f0;
@@ -243,13 +264,11 @@
         <div id="chatBlock" class="chat-main hidden">
             <div id="messages" class="messages-area"></div>
             <div class="input-area">
-                <!-- Кнопка прикрепления теперь принимает и фото, и видео -->
                 <label for="photoInput" class="attach-btn" title="Прикрепить фото или видео">📎</label>
                 <input type="file" id="photoInput" accept="image/*,video/*">
                 <textarea id="messageText" placeholder="Напишите сообщение..." rows="1"></textarea>
                 <button id="sendBtn" class="send-btn">➤</button>
             </div>
-            <!-- Контейнер для предпросмотра изображения (для видео предпросмотр не показываем) -->
             <div id="previewContainer" style="padding: 0 15px 10px; display: none;">
                 <img id="imagePreview" class="photo-preview" src="#" alt="Превью">
             </div>
@@ -263,31 +282,28 @@
     <script>
         (function() {
             // 🔥 ЗАМЕНИТЕ ЭТИ ДАННЫЕ НА СВОИ ИЗ КОНСОЛИ FIREBASE
-const firebaseConfig = {
-  apiKey: "AIzaSyC-SorX-7szfbvjL3F5UEyDrj3TGhX07EY",
-  authDomain: "familychat-bc694.firebaseapp.com",
-  databaseURL: "https://familychat-bc694-default-rtdb.firebaseio.com",
-  projectId: "familychat-bc694",
-  storageBucket: "familychat-bc694.firebasestorage.app",
-  messagingSenderId: "548650677908",
-  appId: "1:548650677908:web:c1b8c4ae111d86eb27e681"
-};
+            const firebaseConfig = {
+                apiKey: "AIzaSyC-SorX-7szfbvjL3F5UEyDrj3TGhX07EY",
+                authDomain: "familychat-bc694.firebaseapp.com",
+                databaseURL: "https://familychat-bc694-default-rtdb.firebaseio.com",
+                projectId: "familychat-bc694",
+                storageBucket: "familychat-bc694.firebasestorage.app",
+                messagingSenderId: "548650677908",
+                appId: "1:548650677908:web:c1b8c4ae111d86eb27e681"
+            };
 
             // Инициализация Firebase
             firebase.initializeApp(firebaseConfig);
             const db = firebase.database();
-            const messagesRef = db.ref('messages'); // ссылка на узел messages
+            const messagesRef = db.ref('messages');
 
-            // --- Параметры ---
-            const FAMILY_PASSWORD = 'family123';   // общий пароль для всех
+            const FAMILY_PASSWORD = 'family123';
             const USER_KEY = 'current_user';
 
-            // --- Глобальные переменные ---
             let currentUser = null;
-            let selectedMediaDataURL = null;   // DataURL выбранного файла (фото или видео)
-            let selectedMediaType = null;       // 'photo' или 'video'
+            let selectedMediaDataURL = null;
+            let selectedMediaType = null;
 
-            // --- Элементы DOM ---
             const loginBlock = document.getElementById('loginBlock');
             const chatBlock = document.getElementById('chatBlock');
             const logoutBtn = document.getElementById('logoutBtn');
@@ -302,7 +318,6 @@ const firebaseConfig = {
             const imagePreview = document.getElementById('imagePreview');
             const previewContainer = document.getElementById('previewContainer');
 
-            // --- Проверка сессии ---
             function checkSession() {
                 const savedUser = localStorage.getItem(USER_KEY);
                 if (savedUser) {
@@ -326,7 +341,6 @@ const firebaseConfig = {
                 logoutBtn.classList.remove('hidden');
                 messageText.value = '';
                 clearMediaPreview();
-                // Подписываемся на обновления сообщений
                 listenForMessages();
             }
 
@@ -338,7 +352,6 @@ const firebaseConfig = {
                 imagePreview.src = '#';
             }
 
-            // --- Слушаем новые сообщения в реальном времени ---
             function listenForMessages() {
                 messagesRef.off();
                 messagesRef.limitToLast(200).on('value', (snapshot) => {
@@ -355,7 +368,16 @@ const firebaseConfig = {
                 });
             }
 
-            // --- Отрисовка сообщений (добавлена поддержка видео) ---
+            // ADDED: функция удаления сообщения
+            function deleteMessage(messageId) {
+                if (!currentUser) return;
+                if (confirm('Удалить это сообщение?')) {
+                    messagesRef.child(messageId).remove()
+                        .catch(error => console.error('Ошибка удаления:', error));
+                }
+            }
+
+            // --- Отрисовка сообщений (ДОБАВЛЕНА КНОПКА УДАЛЕНИЯ) ---
             function renderMessages(messages) {
                 messagesDiv.innerHTML = '';
                 messages.forEach(msg => {
@@ -363,6 +385,19 @@ const firebaseConfig = {
                     msgDiv.className = 'message';
                     if (msg.author === currentUser) {
                         msgDiv.classList.add('own');
+                    }
+
+                    // ADDED: кнопка удаления (только для своих сообщений)
+                    if (msg.author === currentUser) {
+                        const deleteSpan = document.createElement('span');
+                        deleteSpan.className = 'delete-btn';
+                        deleteSpan.textContent = '🗑️';
+                        deleteSpan.title = 'Удалить';
+                        deleteSpan.onclick = (e) => {
+                            e.stopPropagation();
+                            deleteMessage(msg.id);
+                        };
+                        msgDiv.appendChild(deleteSpan);
                     }
 
                     const header = document.createElement('div');
@@ -389,7 +424,6 @@ const firebaseConfig = {
                         msgDiv.appendChild(textDiv);
                     }
 
-                    // Если есть фото
                     if (msg.photo) {
                         const img = document.createElement('img');
                         img.className = 'message-image';
@@ -399,7 +433,6 @@ const firebaseConfig = {
                         msgDiv.appendChild(img);
                     }
 
-                    // Если есть видео (добавлено)
                     if (msg.video) {
                         const video = document.createElement('video');
                         video.className = 'message-video';
@@ -415,7 +448,6 @@ const firebaseConfig = {
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             }
 
-            // --- Отправка сообщения в Firebase (добавлен параметр mediaType) ---
             function sendMessage(text, mediaDataURL, mediaType) {
                 if (!currentUser) return;
                 if (!text.trim() && !mediaDataURL) return;
@@ -426,7 +458,6 @@ const firebaseConfig = {
                     timestamp: firebase.database.ServerValue.TIMESTAMP
                 };
 
-                // Если есть медиа, добавляем соответствующее поле
                 if (mediaDataURL) {
                     if (mediaType === 'photo') {
                         newMessage.photo = mediaDataURL;
@@ -438,7 +469,6 @@ const firebaseConfig = {
                 messagesRef.push(newMessage);
             }
 
-            // --- Обработка выбора файла (теперь поддерживается и видео) ---
             photoInput.addEventListener('change', function(e) {
                 const file = e.target.files[0];
                 if (!file) {
@@ -446,7 +476,6 @@ const firebaseConfig = {
                     return;
                 }
 
-                // Определяем тип файла
                 const isImage = file.type.startsWith('image/');
                 const isVideo = file.type.startsWith('video/');
 
@@ -462,21 +491,15 @@ const firebaseConfig = {
                     selectedMediaType = isImage ? 'photo' : 'video';
 
                     if (isImage) {
-                        // Для фото показываем превью
                         imagePreview.src = selectedMediaDataURL;
                         previewContainer.style.display = 'block';
                     } else {
-                        // Для видео скрываем превью (можно было бы показать иконку, но оставим так)
                         previewContainer.style.display = 'none';
-                        // Можно добавить уведомление, что видео выбрано
-                        // Например, временно изменить текст кнопки или показать всплывашку
-                        // Но для минимальности изменений просто скрываем предпросмотр
                     }
                 };
                 reader.readAsDataURL(file);
             });
 
-            // --- Отправка по кнопке или Enter ---
             function handleSend() {
                 const text = messageText.value;
                 if (!text.trim() && !selectedMediaDataURL) return;
@@ -494,7 +517,6 @@ const firebaseConfig = {
 
             sendBtn.addEventListener('click', handleSend);
 
-            // --- Вход ---
             loginBtn.addEventListener('click', function() {
                 const name = loginName.value.trim();
                 const password = loginPassword.value.trim();
@@ -513,14 +535,12 @@ const firebaseConfig = {
                 loginPassword.value = '';
             });
 
-            // --- Выход ---
             logoutBtn.addEventListener('click', function() {
                 localStorage.removeItem(USER_KEY);
                 messagesRef.off();
                 showLogin();
             });
 
-            // Старт
             checkSession();
         })();
     </script>
